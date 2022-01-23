@@ -13,6 +13,7 @@ import javafx.scene.layout.*;
 import javafx.scene.text.*;
 import javafx.stage.*;
 import javafx.util.*;
+import search.animNodes.*;
 
 import java.io.*;
 import java.util.*;
@@ -21,26 +22,28 @@ public class Main extends Application {
     private static final int SCREEN_WIDTH = 640, SCREEN_HEIGHT = 480;
     private static final File SETTINGS_FILE = new File("C:\\GoogleSearchSettings\\settings.txt");
 
-    private Scene scene;
-    private StackPane searchPane, settingsPane;
+    private final Scene scene;
+    private final StackPane searchPane;
+    private final StackPane settingsPane;
 
     // Search Pane
-    private TextField searchField;
-    private Button searchButton, settingsButton;
-    private Map<Label, Hyperlink> results;
-    private VBox resultVBox;
-    private ScrollPane resultPane;
+    private final AnimatedField searchField;
+    private final AnimatedButton searchButton;
+    private final AnimatedButton settingsButton;
+    private final AnimatedButton clearResultsButton;
+    private final VBox resultVBox;
+    private final ScrollPane resultPane;
 
     // Settings Pane
     // nor = numberOfResults
-    private Slider norSlider;
-    private Button okButton;
-    private TextField norField;
+    private final Slider norSlider;
+    private final AnimatedButton okButton;
+    private final AnimatedField norField;
 
     private int numberOfResults;
     private boolean confirmExit;
     private Pane currentPane;
-    private SimpleDoubleProperty stageHeight;
+    private final SimpleDoubleProperty stageHeight;
 
     public Main() {
         searchPane = new StackPane();
@@ -49,14 +52,13 @@ public class Main extends Application {
 
         scene = new Scene(searchPane, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        searchField = new TextField();
-        norField = new TextField();
+        searchField = new AnimatedField(300, 30, "Search Anything...");
+        norField = new AnimatedField(50, 30, "");
 
-        searchButton = new Button();
-        settingsButton = new Button("SETTINGS");
-        okButton = new Button("OK");
-
-        results = new HashMap<>();
+        searchButton = new AnimatedButton(64, 30, "");
+        settingsButton = new AnimatedButton(100, 20, "SETTINGS");
+        okButton = new AnimatedButton(40, 30, "OK");
+        clearResultsButton = new AnimatedButton(130,20,"CLEAR RESULTS");
 
         norSlider = new Slider();
 
@@ -80,16 +82,18 @@ public class Main extends Application {
                 confirmExit.setTitle("CONFIRM EXIT");
                 confirmExit.setHeaderText("ARE YOU SURE YOU WANT TO QUIT?");
 
-                ButtonType result = confirmExit.showAndWait().get();
-
-                if (result != ButtonType.OK) {
-                    e.consume();
-                    return;
-                }
+                confirmExit.showAndWait().ifPresent(result -> {
+                    if (result == ButtonType.OK) {
+                        saveSettings();
+                        System.exit(0);
+                    } else {
+                        e.consume();
+                    }
+                });
+            } else {
+                saveSettings();
+                System.exit(0);
             }
-
-            saveSettings();
-            System.exit(0);
         });
         stageHeight.bind(stage.heightProperty());
 
@@ -105,24 +109,21 @@ public class Main extends Application {
         searchHBox.getChildren().addAll(searchField, searchButton);
         searchVBox.getChildren().addAll(titleLabel, searchHBox, resultPane);
 
-        searchButton.setPrefSize(64, 30);
-        searchField.prefWidthProperty().bind(stage.widthProperty().divide(2).subtract(searchButton.getPrefWidth() + 4));
-        searchField.setPrefHeight(searchButton.getPrefHeight());
-
         searchVBox.setAlignment(Pos.CENTER);
         searchHBox.setAlignment(Pos.CENTER);
         resultVBox.setAlignment(Pos.CENTER);
 
-        resultVBox.setSpacing(5);
+        resultVBox.setSpacing(10);
         searchVBox.setSpacing(10);
         searchHBox.setSpacing(4);
 
-        ImageView buttonImage = new ImageView(new Image("C:\\javaWork\\workspace\\GoogleSearchV2\\src\\main\\java\\search\\images\\searchButton.png"));
+        ImageView buttonImage = new ImageView(new Image(
+                "C:\\javaWork\\workspace\\GoogleSearchV2\\src\\main\\java\\search\\images\\searchButton.png"));
         buttonImage.setFitWidth(searchButton.getPrefHeight());
         buttonImage.setFitHeight(searchButton.getPrefHeight());
         searchButton.setGraphic(buttonImage);
 
-        EventHandler<ActionEvent> eventHandler = e -> {
+        EventHandler<ActionEvent> searchEvent = e -> {
             if (searchField.getText().equals("")) {
                 e.consume();
                 return;
@@ -132,14 +133,16 @@ public class Main extends Application {
         };
 
         settingsButton.setOnAction(e -> switchPane(settingsPane));
-        searchButton.setOnAction(eventHandler);
-        searchField.setOnAction(eventHandler);
+        searchButton.setOnAction(searchEvent);
+        searchField.setOnAction(searchEvent);
+        clearResultsButton.setOnAction(e -> resultVBox.getChildren().clear());
 
         resultPane.maxHeightProperty().bind(stage.heightProperty().divide(2));
 
-        searchPane.getChildren().addAll(searchVBox, settingsButton);
+        searchPane.getChildren().addAll(searchVBox, settingsButton, clearResultsButton);
 
         StackPane.setAlignment(settingsButton, Pos.BOTTOM_RIGHT);
+        StackPane.setAlignment(clearResultsButton,Pos.BOTTOM_LEFT);
 
         searchPane.setStyle("-fx-background-color: white;");
 
@@ -155,6 +158,8 @@ public class Main extends Application {
             numberOfResults = Integer.parseInt(norField.getText());
             norSlider.setValue(numberOfResults);
         });
+
+        norField.setAlignment(Pos.CENTER);
 
         norSlider.setMax(100);
         norSlider.setMin(1);
@@ -222,7 +227,7 @@ public class Main extends Application {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(SETTINGS_FILE));
 
-            String line = "";
+            String line;
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("nor=")) {
                     numberOfResults = Integer.parseInt(line.substring(4));
@@ -242,7 +247,7 @@ public class Main extends Application {
     }
 
     private void search(String text) {
-        Map<String, String> results = null;
+        Map<String, String> results;
 
         try {
             results = Search.search(text, numberOfResults);
@@ -274,7 +279,7 @@ public class Main extends Application {
                 });
                 vbox.getChildren().addAll(new Label(title), hyperlink);
                 vbox.setAlignment(Pos.CENTER);
-                vbox.setSpacing(2);
+                vbox.setSpacing(1);
 
                 resultVBoxes[i] = vbox;
                 i++;
